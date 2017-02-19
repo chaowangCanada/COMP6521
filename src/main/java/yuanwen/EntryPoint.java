@@ -6,7 +6,10 @@ import java.io.IOException;
  */
 public class EntryPoint {
     public static void main(String[] args) throws IOException{
-        ExternalSortor externalSortor = new ExternalSortor(Configuration.INPUT_FILE_NAME, Configuration.OUTPUT_FILE_NAME);
-        externalSortor.process();
+        ExternalSortor externalSortor = new ExternalSortor();
+        FileJoiner fileJoiner = new FileJoiner();
+        fileJoiner.process(externalSortor.process(Configuration.INPUT_FILE_NAME_1),
+                externalSortor.process(Configuration.INPUT_FILE_NAME_2), Configuration.OUTPUT_FILE_NAME);
+
     }
 }

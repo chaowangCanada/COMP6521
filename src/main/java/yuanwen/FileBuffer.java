@@ -7,10 +7,14 @@ import java.io.IOException;
  * Created by qinyu on 2017-02-01.
  */
 class FileBuffer {
-    public FileBuffer(BufferedReader reader) throws IOException {
-        this.fileBufferReader = reader;
-        reload();
+    public BufferedReader fileBufferReader;
+    private String cache;
+
+    public FileBuffer(BufferedReader bufferedReader) throws IOException {
+        this.fileBufferReader = bufferedReader;
+        read();
     }
+
     public void close() throws IOException {
         this.fileBufferReader.close();
     }
@@ -24,17 +28,15 @@ class FileBuffer {
     }
 
     public String pop() throws IOException {
-        String answer = peek().toString();// make a copy
-        reload();
-        return answer;
+        String result = peek();
+        read();
+        return result;
     }
 
-    private void reload() throws IOException {
+    private void read() throws IOException {
         this.cache = this.fileBufferReader.readLine();
     }
 
-    public BufferedReader fileBufferReader;
 
-    private String cache;
 
 }

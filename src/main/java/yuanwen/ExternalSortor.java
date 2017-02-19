@@ -7,21 +7,19 @@ import java.util.*;
  * Created by qinyu on 2017-01-31.
  */
 public class ExternalSortor {
-    private String inputFileName;
-    private String outputFileName;
 
-    public ExternalSortor(String inputFileName, String outputFileName){
-        this.inputFileName = inputFileName;
-        this.outputFileName = outputFileName;
 
+    public ExternalSortor(){
     }
 
-    public void process() throws IOException{
+    public String process(String inputFileName) throws IOException{
         long availableMemory = getAvailableMemory();
+        String outputFileName = "sorted_" + inputFileName + ".tmp";
         File inputFile = new File(Configuration.INPUT_FILE_PATH,inputFileName);
         File outputFile = new File(outputFileName);
         List<File> tmpFileList = splitAndSort(inputFile, availableMemory);
         mergeSortedTmpFiles(tmpFileList, outputFile);
+        return outputFileName;
     }
 
     private Comparator<String> idComparator = new Comparator<String>() {
@@ -51,7 +49,7 @@ public class ExternalSortor {
             while ((line = reader.readLine()) != null) {
                 if (blockSize >= maxBlockSize)
                 {
-                    files.add(sortAndSaveToTmp(tmpList));
+                    files.add(sortAndSaveToTmp(file, tmpList));
                     blockSize =0;
                     tmpList.clear();
                 }
@@ -65,7 +63,7 @@ public class ExternalSortor {
         }
         finally
         {
-            files.add(sortAndSaveToTmp(tmpList));
+            files.add(sortAndSaveToTmp(file, tmpList));
             tmpList.clear();
         }
 
@@ -73,11 +71,11 @@ public class ExternalSortor {
     }
 
 
-    private File sortAndSaveToTmp(List<String> tmpList)
+    private File sortAndSaveToTmp(File inputFile, List<String> tmpList)
             throws IOException {
 
         Collections.sort(tmpList, idComparator);
-        File tmpFile = File.createTempFile(inputFileName, null, new File(Configuration.TMP_FILE_PATH));
+        File tmpFile = File.createTempFile(inputFile.getName(), null, new File(Configuration.TMP_FILE_PATH));
         tmpFile.deleteOnExit();
         OutputStream out = new FileOutputStream(tmpFile);
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out, "UTF-8"))) {
@@ -90,7 +88,7 @@ public class ExternalSortor {
     }
 
 
-    private int mergeSortedTmpFiles(List<File> fileList, File outputFile)
+    private void mergeSortedTmpFiles(List<File> fileList, File outputFile)
             throws IOException {
         ArrayList<FileBuffer> fileBufferList = new ArrayList<>();
         for (File file : fileList) {
@@ -101,18 +99,17 @@ public class ExternalSortor {
             fileBufferList.add(fileBuffer);
         }
         outputFile.delete();
-        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(
+        BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(
                 new FileOutputStream(outputFile, true), "UTF-8"));
-        int rowNumber = merge(writer, fileBufferList);
+        merge(bufferedWriter, fileBufferList);
 
         for (File file : fileList) {
             file.delete();
         }
-        return rowNumber;
     }
 
 
-    private int merge(BufferedWriter fileBufferWriter, List<FileBuffer> buffers) throws IOException {
+    private void merge(BufferedWriter fileBufferWriter, List<FileBuffer> buffers) throws IOException {
         PriorityQueue<FileBuffer> pq = new PriorityQueue<>(
                 11, new Comparator<FileBuffer>() {
             @Override
@@ -127,14 +124,12 @@ public class ExternalSortor {
                 pq.add(fileBuffer);
             }
         }
-        int rowNumber = 0;
         try {
             while (pq.size() > 0) {
                 FileBuffer fileBuffer = pq.poll();
                 String line = fileBuffer.pop();
                 fileBufferWriter.write(line);
                 fileBufferWriter.newLine();
-                ++rowNumber;
                 if (fileBuffer.empty()) {
                     fileBuffer.fileBufferReader.close();
                 } else {
@@ -147,7 +142,6 @@ public class ExternalSortor {
                 fileBuffer.close();
             }
         }
-        return rowNumber;
     }
 
     private long getStringSize(String str) {

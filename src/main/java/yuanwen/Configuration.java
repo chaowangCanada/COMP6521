@@ -11,7 +11,8 @@ public interface Configuration {
     int OBJECT_REFERENCE = 8;
     int OBJECT_OVERHEAD = OBJECT_HEADER + ARRAR_HEADER +OBJECT_REFERENCE;
 
-    String INPUT_FILE_NAME = "t2.txt";
+    String INPUT_FILE_NAME_1 = "t1.txt";
+    String INPUT_FILE_NAME_2 = "t2.txt";
     String INPUT_FILE_PATH = "C:\\Users\\qinyu\\workspace\\COMP6521\\src\\main\\resources";
     String OUTPUT_FILE_NAME = "output.txt";
     String TMP_FILE_PATH = "C:\\Users\\qinyu\\workspace\\COMP6521\\src\\main\\resources";
