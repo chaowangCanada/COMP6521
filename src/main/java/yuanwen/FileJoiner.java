@@ -13,14 +13,18 @@ public class FileJoiner {
         File file1 = new File(fileName1);
         File file2 = new File(fileName2);
         File outputFile = new File(outputFileName);
+        FileBuffer.readTime = 0;
         try {
             joinFiles(file1, file2, outputFile);
         }catch (Exception e){
             e.printStackTrace();
         }
+        System.out.println("number of reads for join files is " + FileBuffer.readTime);
     }
 
     public void joinFiles(File file1, File file2, File outputFile ) throws IOException{
+        FileBuffer.setAvailableMemory(getAvailableMemory() / 3);
+
         BufferedReader r1 = new BufferedReader(new InputStreamReader(
                 new FileInputStream(file1), "UTF-8"));
         FileBuffer fb1 = new FileBuffer(r1);
@@ -65,5 +69,12 @@ public class FileJoiner {
             fb2.close();
             bufferedWriter.close();
         }
+    }
+
+    private long getAvailableMemory() {
+        System.gc();
+        Runtime runtime = Runtime.getRuntime();
+        long usedMemory = runtime.totalMemory() - runtime.freeMemory();
+        return runtime.maxMemory() - usedMemory;
     }
 }

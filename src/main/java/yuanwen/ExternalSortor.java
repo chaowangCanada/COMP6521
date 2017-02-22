@@ -2,11 +2,14 @@ package yuanwen;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 /**
  * Created by qinyu on 2017-01-31.
  */
 public class ExternalSortor {
+    ArrayList<FileBuffer> fileBufferList = new ArrayList<>();
 
 
     public ExternalSortor(){
@@ -17,8 +20,10 @@ public class ExternalSortor {
         String outputFileName = "sorted_" + inputFileName + ".tmp";
         File inputFile = new File(Configuration.INPUT_FILE_PATH,inputFileName);
         File outputFile = new File(outputFileName);
+        FileBuffer.readTime = 0;
         List<File> tmpFileList = splitAndSort(inputFile, availableMemory);
         mergeSortedTmpFiles(tmpFileList, outputFile);
+        System.out.println("number of reads for sorting file" + inputFileName + " is " + FileBuffer.readTime);
         return outputFileName;
     }
 
@@ -38,51 +43,39 @@ public class ExternalSortor {
 
     private List<File> splitAndSort(File file, long availableMemory) throws IOException {
         List<File> files = new ArrayList<>();
-        long maxBlockSize = availableMemory / 2;
-        List<String> tmpList = new ArrayList<>();
+        FileBuffer.availableMemory = availableMemory /2;
 
         try(BufferedReader reader = new BufferedReader(new InputStreamReader(
                 new FileInputStream(file), "UTF-8")))
         {
-            String line;
-            long blockSize = 0;
-            while ((line = reader.readLine()) != null) {
-                if (blockSize >= maxBlockSize)
-                {
-                    files.add(sortAndSaveToTmp(file, tmpList));
-                    blockSize =0;
-                    tmpList.clear();
-                }
-
-                if (!line.isEmpty())
-                {
-                    tmpList.add(line);
-                    blockSize += getStringSize(line);
-                }
+            FileBuffer fileBuffer = new FileBuffer(reader);
+            while (!fileBuffer.empty()) {
+                    files.add(sortAndSaveToTmp(file, fileBuffer));
             }
-        }
-        finally
-        {
-            files.add(sortAndSaveToTmp(file, tmpList));
-            tmpList.clear();
+            fileBuffer.close();
         }
 
         return files;
     }
 
 
-    private File sortAndSaveToTmp(File inputFile, List<String> tmpList)
+    private File sortAndSaveToTmp(File inputFile, FileBuffer fileBuffer)
             throws IOException {
 
-        Collections.sort(tmpList, idComparator);
+        fileBuffer.sort(idComparator);
         File tmpFile = File.createTempFile(inputFile.getName(), null, new File(Configuration.TMP_FILE_PATH));
         tmpFile.deleteOnExit();
         OutputStream out = new FileOutputStream(tmpFile);
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out, "UTF-8"))) {
-            for (String r : tmpList) {
-                writer.write(r);
+            while (fileBuffer.size() >= 2) {
+                if (fileBuffer.size() == 1){
+                    System.out.print("");
+                }
+                writer.write(fileBuffer.pop());
                 writer.newLine();
             }
+            writer.write(fileBuffer.pop());
+            writer.newLine();
         }
         return tmpFile;
     }
@@ -90,7 +83,8 @@ public class ExternalSortor {
 
     private void mergeSortedTmpFiles(List<File> fileList, File outputFile)
             throws IOException {
-        ArrayList<FileBuffer> fileBufferList = new ArrayList<>();
+
+        FileBuffer.setAvailableMemory(getAvailableMemory()/(2 * fileList.size()));
         for (File file : fileList) {
             BufferedReader reader = new BufferedReader(new InputStreamReader(
                     new FileInputStream(file), "UTF-8"));
@@ -109,7 +103,7 @@ public class ExternalSortor {
     }
 
 
-    private void merge(BufferedWriter fileBufferWriter, List<FileBuffer> buffers) throws IOException {
+    private void merge(BufferedWriter bufferedWriter, List<FileBuffer> fileBufferList) throws IOException {
         PriorityQueue<FileBuffer> pq = new PriorityQueue<>(
                 11, new Comparator<FileBuffer>() {
             @Override
@@ -119,7 +113,8 @@ public class ExternalSortor {
             }
         });
 
-        for (FileBuffer fileBuffer : buffers) {
+        int bufferNum = fileBufferList.size();
+        for (FileBuffer fileBuffer : fileBufferList) {
             if (!fileBuffer.empty()) {
                 pq.add(fileBuffer);
             }
@@ -128,23 +123,22 @@ public class ExternalSortor {
             while (pq.size() > 0) {
                 FileBuffer fileBuffer = pq.poll();
                 String line = fileBuffer.pop();
-                fileBufferWriter.write(line);
-                fileBufferWriter.newLine();
+                bufferedWriter.write(line);
+                bufferedWriter.newLine();
                 if (fileBuffer.empty()) {
-                    fileBuffer.fileBufferReader.close();
+                    fileBuffer.close();
+                    if (bufferNum > 1){
+                        FileBuffer.setAvailableMemory(FileBuffer.availableMemory * (bufferNum) / (--bufferNum));
+                    }
                 } else {
                     pq.add(fileBuffer);
                 }
             }
         } finally {
-            fileBufferWriter.close();
+            bufferedWriter.close();
             for (FileBuffer fileBuffer : pq) {
                 fileBuffer.close();
             }
         }
-    }
-
-    private long getStringSize(String str) {
-        return (str.length() * 2) + Configuration.OBJECT_OVERHEAD;
     }
 }
